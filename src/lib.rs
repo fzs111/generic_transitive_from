@@ -1,5 +1,5 @@
-#![no_std]
 #![forbid(unsafe_code)]
+#![cfg_attr(not(test), no_std)]
 
 //! [![crates.io]](https://crates.io/crates/transitive_from)
 //! [![github]](https://github.com/steffahn/transitive_from)
@@ -92,6 +92,7 @@ impl_From!(<L> for I);
 // Now, to produce all the remaining (transitive) implementations
 // and complete the hierarchy, call the macro like this:
 transitive_from::hierarchy! {
+    []
     A {
         B {
             E,
@@ -117,20 +118,24 @@ A::from(L);
 #[macro_export]
 macro_rules! hierarchy {
 
-    ($($root:ty $({
-        $($child:ty $({
-            $($grandchildren_parsed_recursively:tt)*
+    (
+        $generics:tt
+        $($root:ty $({
+            $($child:ty $({
+                $($grandchildren_parsed_recursively:tt)*
+            })?),* $(,)?
         })?),* $(,)?
-    })?),* $(,)?) => {
+    ) => {
         $($(
             $crate::hierarchy!{
+                $generics
                 $($child $({
                     $($grandchildren_parsed_recursively)*
                 })?),*
             }
             $($(
                 $crate::__hierarchy_internals!{
-                    [$root][$child][
+                    $generics[$root][$child][
                         $($grandchildren_parsed_recursively)*
                     ]
                 }
@@ -143,40 +148,51 @@ macro_rules! hierarchy {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __hierarchy_internals {
-    ([$root:ty][$child:ty][
+    ($generics:tt[$root:ty][$child:ty][
         $($grandchild:ty $({
             $($further:tt)*
         })?),* $(,)?
     ]) => {
         $(
             $($crate::__hierarchy_internals!{
-                [$root][$child][
+                $generics[$root][$child][
                     $($further)*
                 ]
             })?
-            impl ::core::convert::From<$grandchild> for $root {
-                fn from(g: $grandchild) -> Self {
-                    <$root>::from(<$child>::from(g))
-                }
+            $crate::__hierarchy_internals_impl!{
+                $generics[$root][$child][$grandchild]
             }
         )*
     };
 }
 
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __hierarchy_internals_impl {
+    ([$($generic:tt),*][$root:ty][$child:ty][$grandchild:ty]) => {
+        impl<$($generic),*> ::core::convert::From<$grandchild> for $root {
+            fn from(g: $grandchild) -> Self {
+                <$root>::from(<$child>::from(g))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     #![allow(unused)]
-    pub enum GlobalError {
+    pub enum GlobalError<'a> {
         Shape(ShapeError),
-        Color(ColorError),
+        Color(ColorError<'a>),
     }
-    impl From<ShapeError> for GlobalError {
+    impl From<ShapeError> for GlobalError<'_> {
         fn from(e: ShapeError) -> Self {
             Self::Shape(e)
         }
     }
-    impl From<ColorError> for GlobalError {
-        fn from(e: ColorError) -> Self {
+    impl<'a> From<ColorError<'a>> for GlobalError<'a> {
+        fn from(e: ColorError<'a>) -> Self {
             Self::Color(e)
         }
     }
@@ -216,36 +232,37 @@ mod test {
         a: f64,
     }
 
-    pub enum ColorError {
-        Red(RedError),
-        Blue(BlueError),
+    pub enum ColorError<'a> {
+        Red(RedError<'a>),
+        Blue(BlueError<'a>),
     }
-    impl From<RedError> for ColorError {
-        fn from(e: RedError) -> Self {
+    impl<'a> From<RedError<'a>> for ColorError<'a> {
+        fn from(e: RedError<'a>) -> Self {
             Self::Red(e)
         }
     }
-    impl From<BlueError> for ColorError {
-        fn from(e: BlueError) -> Self {
+    impl<'a> From<BlueError<'a>> for ColorError<'a> {
+        fn from(e: BlueError<'a>) -> Self {
             Self::Blue(e)
         }
     }
 
-    pub struct RedError {
-        msg: &'static str,
+    pub struct RedError<'a> {
+        msg: &'a str,
     }
 
-    pub struct BlueError {
-        msg: &'static str,
+    pub struct BlueError<'a> {
+        msg: &'a str,
     }
 
     crate::hierarchy! {
-        GlobalError {
+        ['a]
+        GlobalError<'a> {
             ShapeError {
                 CircleError,
                 RectangleError { SquareError },
             },
-            ColorError { RedError, BlueError }
+            ColorError<'a> { RedError<'a>, BlueError<'a> }
         }
     }
 
@@ -256,7 +273,7 @@ mod test {
         })
     }
 
-    fn bar() -> Result<(), GlobalError> {
+    fn bar() -> Result<(), GlobalError<'static>> {
         foo()?;
         Ok(())
     }
@@ -264,5 +281,14 @@ mod test {
     #[test]
     fn conversion_test() {
         bar().err().unwrap();
+    }
+
+    #[test]
+    fn baz() {
+        let s = std::string::String::from("error");
+        let e = RedError{
+            msg: &s
+        };
+        let a: GlobalError = e.into();
     }
 }
