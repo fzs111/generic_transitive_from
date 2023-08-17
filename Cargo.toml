@@ -1,14 +1,13 @@
 [package]
-name = "transitive_from"
+name = "generic_transitive_from"
 version = "0.1.3"
-authors = ["Frank Steffahn <fdsteffahn@gmail.com>"]
+authors = ["FZs", "Frank Steffahn <fdsteffahn@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = """
-Helper macros for creating hierarchies of transitive `From` implementations.
+Helper macros for creating hierarchies of transitive `From` implementations with support for lifetimes/generics.
 """
-repository = "https://github.com/steffahn/transitive_from"
-homepage = "https://github.com/steffahn/transitive_from"
-documentation = "https://docs.rs/transitive_from"
+repository = "https://github.com/fzs111/generic_transitive_from"
+homepage = "https://github.com/fzs111/generic_transitive_from"
 keywords = ["derive", "From"]
 categories = ["rust-patterns", "no-std"]
 readme = "README.md"

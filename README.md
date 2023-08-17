@@ -1,22 +1,14 @@
-# transitive_from
+# generic_transitive_from
 
-[![docs.rs]](https://docs.rs/transitive_from)
-[![crates.io]](https://crates.io/crates/transitive_from)
-[![github]](https://github.com/steffahn/transitive_from)
+[![github]](https://github.com/fzs111/generic_transitive_from)
 [![MIT / Apache 2.0 licensed]](#License)
 [![unsafe forbidden]](https://github.com/rust-secure-code/safety-dance/)
 
-[github]: https://img.shields.io/badge/github-steffahn/transitive__from-yellowgreen.svg
-[crates.io]: https://img.shields.io/crates/v/transitive_from.svg
-[MIT / Apache 2.0 licensed]: https://img.shields.io/crates/l/transitive_from.svg
-[docs.rs]: https://docs.rs/transitive_from/badge.svg
+[github]: https://img.shields.io/badge/github-fzs111/generic__transitive__from-red.svg
+[MIT / Apache 2.0 licensed]: https://img.shields.io/badge/license-MIT_or_Apache--2.0-blue.svg
 [unsafe forbidden]: https://img.shields.io/badge/unsafe-forbidden-success.svg
 
-
-Helper macros for creating hierarchies of transitive `From` implementations.
-
-Currently, this crate only consists of the [`transitive_from::hierarchy`](https://docs.rs/transitive_from/0.1/transitive_from/macro.hierarchy.html) macro.  
-Please use the link to go to its page for further documentation.
+This repository is a fork of [steffahn/transitive_from](https://github.com/steffahn/transitive_from), extended to support lifetimes/generics.
 
 ## License
 Licensed under either of

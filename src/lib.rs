@@ -1,21 +1,15 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), no_std)]
 
-//! [![crates.io]](https://crates.io/crates/transitive_from)
-//! [![github]](https://github.com/steffahn/transitive_from)
-//! [![MIT / Apache 2.0 licensed]](https://github.com/steffahn/transitive_from#License)
+//! [![github]](https://github.com/fzs111/generic_transitive_from)
+//! [![MIT / Apache 2.0 licensed]](#License)
 //! [![unsafe forbidden]](https://github.com/rust-secure-code/safety-dance/)
-//!
-//! Helper macros for creating hierarchies of transitive [`From`] implementations.
-//!
-//! Currently, this crate only consists of the [`transitive_from::hierarchy`](hierarchy) macro.  
-//! Please use the link to go to its page for further documentation.
-//!
-//! [github]: https://img.shields.io/badge/github-steffahn/transitive__from-yellowgreen.svg
-//! [crates.io]: https://img.shields.io/crates/v/transitive_from.svg
-//! [MIT / Apache 2.0 licensed]: https://img.shields.io/crates/l/replace_with.svg
-//! [docs.rs]: https://docs.rs/transitive_from/badge.svg
+//! 
+//! [github]: https://img.shields.io/badge/github-fzs111/generic__transitive__from-red.svg
+//! [MIT / Apache 2.0 licensed]: https://img.shields.io/badge/license-MIT_or_Apache--2.0-blue.svg
 //! [unsafe forbidden]: https://img.shields.io/badge/unsafe-forbidden-success.svg
+//! 
+//! This repository is a fork of [steffahn/transitive_from](https://github.com/steffahn/transitive_from), extended to support lifetimes/generics.
 
 /**
 Helper macro to create transitive [`From`] implementations.
@@ -29,94 +23,115 @@ the immediate edges.
 
 For further details, study the example below.
 
-The syntax supports arbitrary type expressions where the example just
-uses simple names like `A`, `B`, `C`, etc; the macro does
-however not produce any generic implementations. Inside of each `{` `}`
-block, a trailing comma is optional.
+The first item of the macro invocation must be a list of generics and 
+lifetimes enclosed by square brackets, which will be applied to all impls
+the macro generates. You can also specify bounds on the types.
+
+That is followed by the definition of the tree structure. Inside of each 
+`{` `}` block, a trailing comma is optional.
+
+Note that the same generic arguments will be provided to *all* implementations.
+It is *not* an error to specify superfluous lifetime parameters, 
+so it is possible to only use a subset of the in some impls. The same is not true 
+for generic types, each type must be used in each implementation.
 
 # Examples
-```
-// Here’s a drawing of an example hierarchy.
-//
-//            ┌─ E
-//      ┌─ B ─┤     ┌─ J
-//      │     └─ F ─┤
-//      │           └─ K
-//   A ─┼─ C ─── G
-//      │
-//      │     ┌─ H
-//      └─ D ─┤
-//            └─ I ─── L
-//
-// For example, all these types could be error types and we
-// would like to fully support upcasting with the `?` operator
-// from anywhere to anywhere in this hierarchy.
-struct A;
-struct B;
-struct C;
-struct D;
-struct E;
-struct F;
-struct G;
-struct H;
-struct I;
-struct J;
-struct K;
-struct L;
 
-// We need to provide implementation for all the tree edges
-// (all the immediate "child -> parent" steps) manually,
-// or by some other means. In this example we use a small macro
-// to save some boilerplate.
-macro_rules! impl_From {
-    (<$B:ident> for $A:ident) => {
-        impl From<$B> for $A {
-            fn from(_: $B) -> $A {
-                $A
+```
+# use core::fmt::Debug;
+
+enum A<'a, T>{
+    B(B<T>),
+    E(E<'a, T>)
+}
+struct B<T>(T);
+
+struct C<T>(T);
+struct D<T>(T);
+
+struct E<'a, T>(F<'a, T>);
+struct F<'a, T>(&'a T);
+
+//It is required to manually provide From implementations for each step in the hierarchy: 
+
+impl<'a, T> From<C<T>> for B<T> {
+    fn from(C(t): C<T>) -> Self {
+        B(t)
+    }
+}
+impl<'a, T> From<D<T>> for B<T> {
+    fn from(D(t): D<T>) -> Self {
+        B(t)
+    }
+}
+impl<'a, T> From<T> for D<T> {
+    fn from(t: T) -> Self {
+        D(t)
+    }
+}
+
+impl<'a, T> From<B<T>> for A<'a, T> {
+    fn from(b: B<T>) -> Self {
+        A::B(b)
+    }
+}
+
+impl<'a, T> From<E<'a, T>> for A<'a, T> {
+    fn from(e: E<'a, T>) -> Self {
+        A::E(e)
+    }
+}
+
+
+impl<'a, T> From<F<'a, T>> for E<'a, T> {
+    fn from(f: F<'a, T>) -> Self {
+        E(f)
+    }
+}
+
+impl<'a, T> From<&'a T> for F<'a, T> {
+    fn from(r: &'a T) -> Self {
+        F(r)
+    }
+}
+
+// Now, to produce all the remaining (transitive) implementations
+// and complete the hierarchy, call the macro like this:
+
+generic_transitive_from::impl_from! {
+    ['a, T: Debug]
+    A<'a, T> {
+        B<T> {
+            C<T>,
+            D<T> {
+                T
+            }
+        },
+        E<'a, T>{
+            F<'a, T> {
+                &'a T
             }
         }
     }
 }
-impl_From!(<B> for A);
-impl_From!(<C> for A);
-impl_From!(<D> for A);
-impl_From!(<E> for B);
-impl_From!(<F> for B);
-impl_From!(<G> for C);
-impl_From!(<H> for D);
-impl_From!(<I> for D);
-impl_From!(<J> for F);
-impl_From!(<K> for F);
-impl_From!(<L> for I);
 
-// Now, to produce all the remaining (transitive) implementations
-// and complete the hierarchy, call the macro like this:
-transitive_from::hierarchy! {
-    []
-    A {
-        B {
-            E,
-            F { J, K },
-        },
-        C { G },
-        D {
-            H,
-            I { L },
-        },
-    }
-}
-// Note how the syntax resembles the tree drawn at the top of this example.
+/*
+This macro call will create the following impls:
+
+impl<'a, T: Debug> From<C<T>>     for A<'a, T> { ... }
+impl<'a, T: Debug> From<D<T>>     for A<'a, T> { ... }
+impl<'a, T: Debug> From<T>        for A<'a, T> { ... }
+impl<'a, T: Debug> From<T>        for B<'a, T> { ... }
+impl<'a, T: Debug> From<F<'a, T>> for A<'a, T> { ... }
+impl<'a, T: Debug> From<&'a T>    for A<'a, T> { ... }
+impl<'a, T: Debug> From<&'a T>    for E<'a, T> { ... }
+*/
 
 // Finally, a few demonstration/test cases:
-A::from(K);
-A::from(E);
-B::from(K);
-D::from(L);
-A::from(L);
 ```
 */
 #[macro_export]
-macro_rules! hierarchy {
+macro_rules! impl_from {
 
     (
         $generics:tt
@@ -127,14 +142,14 @@ macro_rules! hierarchy {
         })?),* $(,)?
     ) => {
         $($(
-            $crate::hierarchy!{
+            $crate::impl_from!{
                 $generics
                 $($child $({
                     $($grandchildren_parsed_recursively)*
                 })?),*
             }
             $($(
-                $crate::__hierarchy_internals!{
+                $crate::__impl_from_internals_recursive!{
                     $generics[$root][$child][
                         $($grandchildren_parsed_recursively)*
                     ]
@@ -147,19 +162,19 @@ macro_rules! hierarchy {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __hierarchy_internals {
+macro_rules! __impl_from_internals_recursive {
     ($generics:tt[$root:ty][$child:ty][
         $($grandchild:ty $({
             $($further:tt)*
         })?),* $(,)?
     ]) => {
         $(
-            $($crate::__hierarchy_internals!{
+            $($crate::__impl_from_internals_recursive!{
                 $generics[$root][$child][
                     $($further)*
                 ]
             })?
-            $crate::__hierarchy_internals_impl!{
+            $crate::__impl_from_internals_make_impl!{
                 $generics[$root][$child][$grandchild]
             }
         )*
@@ -169,9 +184,9 @@ macro_rules! __hierarchy_internals {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __hierarchy_internals_impl {
-    ([$($generic:tt),*][$root:ty][$child:ty][$grandchild:ty]) => {
-        impl<$($generic),*> ::core::convert::From<$grandchild> for $root {
+macro_rules! __impl_from_internals_make_impl {
+    ([$($generic:tt)*][$root:ty][$child:ty][$grandchild:ty]) => {
+        impl<$($generic)*> ::core::convert::From<$grandchild> for $root {
             fn from(g: $grandchild) -> Self {
                 <$root>::from(<$child>::from(g))
             }
@@ -255,7 +270,7 @@ mod test {
         msg: &'a str,
     }
 
-    crate::hierarchy! {
+    crate::impl_from! {
         ['a]
         GlobalError<'a> {
             ShapeError {
